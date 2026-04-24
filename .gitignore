@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+#  Packaging 
+*.egg-info/
+dist/
+build/
+
+# Testing & Coverage 
+.pytest_cache/
+.coverage*
+htmlcov/
+
+# Logs 
+logs/
+*.log
+
+#  Data 
+data/raw/*
+data/cleaned/*
+!data/raw/.gitkeep
+!data/cleaned/.gitkeep
+
+# ML Experiments 
+mlruns/
+wandb/
+
+# Environment Variables
+.env.local
+
+# IDE / OS 
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Python Version 
+.python-version
