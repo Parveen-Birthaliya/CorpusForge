@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backend.lagacy:build"
+
+[project]
+name = "CorpusForge"
+version = "0.1.0"
+description = " Clean text corpora for AI application"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "Parveen Birthlia", email ="parveenbirthlia@gmail.com"}]
+dependencies = ["tqdm>=4.66"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
