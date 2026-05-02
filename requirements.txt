@@ -7,6 +7,9 @@ PyMuPDF>=1.23
 # Component 4: Filters
 langdetect>=1.0
 
+# Component 5: Deduplication
+datasketch>=1.6
+
 # Dev
 pytest>=7.4
 pytest-cov>=4.1
