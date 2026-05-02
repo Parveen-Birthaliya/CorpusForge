@@ -20,11 +20,15 @@ _PAGE_MARK = re.compile(
 )
 _URL         = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
 _SOFT_HYPHEN = re.compile(r"([a-zA-Z]+)-\n\s*([a-zA-Z]+)")         # Word split across lines
+_FRAGMENT    = re.compile(r"([^\.\?!:;\-\n])\n\s*([a-z])")        # Sentence broken across lines
 
 
 
 def normalise_whitespace(text: str) -> str:
     """Collapse runs of spaces/tabs → single space. Strip line edges. Max 2 newlines."""
+
+    # Join fragmented sentences (e.g. broken over lines without punctuation)
+    text = join_fragmented_sentences(text)
 
     # Collapse horizontal whitespace
     text = _HORIZ_WS.sub(" ", text)
@@ -53,3 +57,8 @@ def remove_page_markers(text: str) -> str:
 def fix_hyphenation(text: str) -> str:
     """Join words split by line-break hyphens: 'exam-\\nines' → 'examines'."""
     return _SOFT_HYPHEN.sub(r"\1\2", text)
+
+
+def join_fragmented_sentences(text: str) -> str:
+    """Joins lines that do not end in terminal punctuation with the next lowercase line."""
+    return _FRAGMENT.sub(r"\1 \2", text)

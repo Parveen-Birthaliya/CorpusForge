@@ -101,4 +101,27 @@ def remove_structural_noise(text: str) -> str:
     """
     for pattern in _ALL_PATTERNS:
         text = pattern.sub("", text)
-    return text
+        
+    return remove_symbol_heavy_lines(text)
+
+
+def remove_symbol_heavy_lines(text: str) -> str:
+    """Removes lines where >40% of the non-space characters are symbols."""
+    lines = text.split("\n")
+    kept = []
+    for line in lines:
+        if not line.strip():
+            kept.append(line)
+            continue
+            
+        alnum_count = sum(c.isalnum() for c in line)
+        non_space_count = len(line.replace(" ", "").replace("\t", ""))
+        
+        if non_space_count > 0:
+            alnum_ratio = alnum_count / non_space_count
+            if alnum_ratio < 0.60: # More than 40% symbols
+                continue # Drop the line
+                
+        kept.append(line)
+        
+    return "\n".join(kept)

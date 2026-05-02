@@ -22,12 +22,12 @@ def _run_pipeline_on_files(
     skip_near_dedup: bool,
     enable_advanced_pii: bool,
     enable_ocr: bool,
-) -> tuple[str, str]:
+) -> tuple[str, str, str, str]:
     """Run the full CorpusForge pipeline on uploaded files.
 
     Returns
     -------
-    (jsonl_path, report_text)
+    (zip_path, jsonl_path, report_text, preview_text)
     """
     from src.corpusforge.cleaners import HeuristicCleaner
     from src.corpusforge.dedup import Deduplicator
@@ -40,7 +40,7 @@ def _run_pipeline_on_files(
     # Gradio ≥6 returns a list of dicts with 'path' key (or NamedString).
     # Older versions return plain file-path strings.
     if not uploaded_files:
-        return "", "❌ No files uploaded."
+        return "", "", "❌ No files uploaded.", ""
 
     file_paths: list[Path] = []
     for f in uploaded_files:
@@ -84,7 +84,7 @@ def _run_pipeline_on_files(
         msg = "❌ No files could be loaded."
         if errors:
             msg += "\n\nErrors:\n" + "\n".join(errors)
-        return "", msg
+        return "", "", msg, ""
 
     # ── Stage 2: Clean ───────────────────────────────────────────────────
     cleaning_results = [cleaner.clean(doc) for doc in docs]
@@ -108,7 +108,16 @@ def _run_pipeline_on_files(
     import shutil
     zip_path = str(out_dir / "corpusforge_results")
     shutil.make_archive(zip_path, 'zip', out_dir)
-    final_output_path = f"{zip_path}.zip"
+    final_zip_path = f"{zip_path}.zip"
+    final_jsonl_path = str(out_dir / "cleaned_corpus.jsonl")
+    
+    # ── Get Preview Text ──────────────────────────────────────────────────
+    preview_text = ""
+    if texts:
+        first_doc_id = list(texts.keys())[0]
+        preview_text = texts[first_doc_id]
+        if len(preview_text) > 2000:
+            preview_text = preview_text[:2000] + "\n\n... (truncated for preview)"
 
     # ── Human-readable report ─────────────────────────────────────────────
     lines = [
@@ -132,7 +141,7 @@ def _run_pipeline_on_files(
         for reason, count in sorted(report.reject_reasons.items(), key=lambda x: -x[1]):
             lines.append(f"    {reason:<16} : {count}")
 
-    return final_output_path, "\n".join(lines)
+    return final_zip_path, final_jsonl_path, "\n".join(lines), preview_text
 
 
 def create_ui():
@@ -216,17 +225,33 @@ Upload `.txt` or `.pdf` files → the 5-stage pipeline runs automatically → do
             # ── RIGHT COLUMN: Results ─────────────────────────────────────
             with gr.Column(scale=1):
                 gr.Markdown("### 📊 Results")
-                report_output = gr.Textbox(
-                    label="Pipeline Report",
-                    lines=22,
-                    max_lines=30,
-                    interactive=False,
-                    placeholder="Run the pipeline to see results here…",
-                )
-                file_output = gr.File(
-                    label="⬇️ Download corpusforge_results.zip",
-                    interactive=False,
-                )
+                
+                with gr.Tabs():
+                    with gr.Tab("📝 Preview (First File)"):
+                        preview_output = gr.Textbox(
+                            label="Cleaned Text Preview",
+                            lines=12,
+                            max_lines=20,
+                            interactive=False,
+                            show_copy_button=True,
+                        )
+                    with gr.Tab("📈 Report"):
+                        report_output = gr.Textbox(
+                            label="Pipeline Report",
+                            lines=12,
+                            max_lines=20,
+                            interactive=False,
+                        )
+                        
+                with gr.Row():
+                    jsonl_output = gr.File(
+                        label="📄 Download .jsonl",
+                        interactive=False,
+                    )
+                    file_output = gr.File(
+                        label="📦 Download .zip (All Files)",
+                        interactive=False,
+                    )
 
         # ── Wire up events ────────────────────────────────────────────────
         run_btn.click(
@@ -240,10 +265,10 @@ Upload `.txt` or `.pdf` files → the 5-stage pipeline runs automatically → do
                 enable_pii_input,
                 enable_ocr_input,
             ],
-            outputs=[file_output, report_output],
+            outputs=[file_output, jsonl_output, report_output, preview_output],
         )
 
-        clear_btn.add([file_input, report_output, file_output])
+        clear_btn.add([file_input, file_output, jsonl_output, report_output, preview_output])
 
         # ── Footer ────────────────────────────────────────────────────────
         gr.Markdown(
