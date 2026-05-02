@@ -4,30 +4,37 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "CorpusForge"
-version = "0.1.0"
-description = " Clean text corpora for AI application"
-requires-python = ">=3.9"
+version = "0.3.0"
+description = "A professional-grade hybrid NLP corpus cleaning pipeline for AI/NLP workloads."
+readme = "README.md"
+requires-python = ">=3.10"
 license = {text = "MIT"}
-authors = [{name = "Parveen Birthlia", email ="parveenbirthlia@gmail.com"}]
-dependencies = ["tqdm>=4.66"]
+authors = [{name = "Parveen Birthalia", email = "parveenbirthalia@gmail.com"}]
+keywords = ["nlp", "corpus", "cleaning", "deduplication", "text-processing", "ai", "llm"]
+dependencies = [
+    "tqdm>=4.66",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [project.optional-dependencies]
 pdf     = ["PyMuPDF>=1.23"]
-html    = ["beautifulsoup4>=4.12", "lxml>=4.9"]
-filters = ["langdetect>=1.0", "nltk>=3.8"]
+filters = ["langdetect>=1.0"]
 dedup   = ["datasketch>=1.6"]
+ml      = ["spacy>=3.7", "symspellpy>=6.7"]
+api     = ["fastapi", "uvicorn", "python-multipart"]
 ui      = ["gradio>=4.15"]
 dev     = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.4"]
 all     = [
     "PyMuPDF>=1.23",
-    "beautifulsoup4>=4.12",
-    "lxml>=4.9",
     "langdetect>=1.0",
-    "nltk>=3.8",
     "datasketch>=1.6",
+    "spacy>=3.7",
+    "symspellpy>=6.7",
+    "fastapi",
+    "uvicorn",
+    "python-multipart",
     "gradio>=4.15",
 ]
 
@@ -36,12 +43,12 @@ corpusforge = "src.corpusforge.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+addopts   = "-v --tb=short"
 
 [tool.ruff]
-line-length = 88                  # Same as black formatter
-target-version = "py39"           # Minimum Python target
-select = ["E", "F", "I", "UP"]  # Error, pyflakes, isort, pyupgrade
+line-length    = 88
+target-version = "py310"
+select         = ["E", "F", "I", "UP"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["corpusforge"]

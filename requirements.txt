@@ -1,23 +1,28 @@
-# Core
+# ── Core ──────────────────────────────────────────────────────────────────────
 tqdm>=4.66
 
-# Component 2: Loaders
-PyMuPDF>=1.23
+# ── Loaders ───────────────────────────────────────────────────────────────────
+PyMuPDF>=1.23              # PDF text extraction
 
-# Component 4: Filters
-langdetect>=1.0
+# ── Filters ───────────────────────────────────────────────────────────────────
+langdetect>=1.0            # Language identification
 
-# Component 5: Deduplication
-datasketch>=1.6
+# ── Deduplication ─────────────────────────────────────────────────────────────
+datasketch>=1.6            # MinHash LSH near-deduplication
 
-# Component 8: Web UI
+# ── Advanced ML Cleaners (always-on) ──────────────────────────────────────────
+spacy>=3.7                 # NER for PII redaction  (run: python -m spacy download en_core_web_sm)
+symspellpy>=6.7            # OCR auto-correction
+
+# ── Web API & UI ──────────────────────────────────────────────────────────────
+fastapi                    # REST API backend
+uvicorn                    # ASGI server
+python-multipart           # File upload support
+
+# ── Legacy Web UI (kept for reference) ────────────────────────────────────────
 gradio>=4.15
 
-# Dev
+# ── Dev / Testing ─────────────────────────────────────────────────────────────
 pytest>=7.4
 pytest-cov>=4.1
 ruff>=0.4
-# FastAPI Server
-fastapi
-uvicorn
-python-multipart
