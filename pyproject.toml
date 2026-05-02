@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68"]
-build-backend = "setuptools.backend.lagacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "CorpusForge"
@@ -30,6 +30,9 @@ all     = [
     "datasketch>=1.6",
     "gradio>=4.15",
 ]
+
+[project.scripts]
+corpusforge = "src.corpusforge.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
