@@ -6,7 +6,7 @@ from typing import Optional
 
 try:
     from symspellpy import SymSpell
-    import pkg_resources
+    import importlib.resources
     _HAS_SYMSPELL = True
 except ImportError:
     _HAS_SYMSPELL = False
@@ -24,10 +24,8 @@ class OcrCleaner:
         # max_dictionary_edit_distance=2 is standard
         self.sym_spell = SymSpell(max_dictionary_edit_distance=2, prefix_length=7)
         try:
-            dictionary_path = pkg_resources.resource_filename(
-                "symspellpy", "frequency_dictionary_en_82_765.txt"
-            )
-            self.sym_spell.load_dictionary(dictionary_path, term_index=0, count_index=1)
+            dictionary_path = importlib.resources.files("symspellpy") / "frequency_dictionary_en_82_765.txt"
+            self.sym_spell.load_dictionary(str(dictionary_path), term_index=0, count_index=1)
         except Exception:
             self.sym_spell = None
 

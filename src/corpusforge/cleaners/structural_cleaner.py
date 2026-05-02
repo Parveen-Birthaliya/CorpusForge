@@ -10,7 +10,7 @@ _PII_PATTERNS = [
     # Email: ... (standalone line)
     re.compile(r"^\s*Email:\s*\S+@\S+.*$", re.IGNORECASE | re.MULTILINE),
     # Phone: ... (handles digits, letters like 1-800-TECH, extensions)
-    re.compile(r"^\s*Phone:\s*[\+\d\-\(\)\s\w\.]+$", re.IGNORECASE | re.MULTILINE),
+    re.compile(r"^\s*Phone:\s*[\+\d\-\(\) \t\w\.]+$", re.IGNORECASE | re.MULTILINE),
     # Contact: ... (standalone line)
     re.compile(r"^\s*(?:Emergency\s+)?Contact:\s*.+$", re.IGNORECASE | re.MULTILINE),
     # Posted by: email@domain  (blog metadata)
