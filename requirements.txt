@@ -1,0 +1,13 @@
+# Core
+tqdm>=4.66
+
+# Component 2: Loaders
+PyMuPDF>=1.23
+
+# Component 4: Filters
+langdetect>=1.0
+
+# Dev
+pytest>=7.4
+pytest-cov>=4.1
+ruff>=0.4
