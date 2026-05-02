@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CorpusForge | NLP Cleaner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <header class="navbar">
+        <a href="#" class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            CorpusForge
+        </a>
+    </header>
+
+    <div class="app-container">
+        
+        <!-- Sidebar Settings -->
+        <aside class="sidebar">
+            <form id="pipeline-form">
+                <div class="settings-group">
+                    <h3>General Settings</h3>
+                    
+                    <div class="input-group">
+                        <label for="target_lang">Target Language</label>
+                        <select id="target_lang" name="target_lang">
+                            <option value="en" selected>English (en)</option>
+                            <option value="fr">French (fr)</option>
+                            <option value="de">German (de)</option>
+                            <option value="es">Spanish (es)</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="min_chars">Min Characters (<span id="min_chars_val">100</span>)</label>
+                        <input type="range" id="min_chars" name="min_chars" min="0" max="1000" step="50" value="100">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="max_rep">Max Repetition (<span id="max_rep_val">0.2</span>)</label>
+                        <input type="range" id="max_rep" name="max_rep" min="0" max="1" step="0.05" value="0.2">
+                    </div>
+
+                    <label class="toggle-checkbox">
+                        <input type="checkbox" name="skip_near_dedup">
+                        <span class="checkmark"></span>
+                        <div class="label-text">
+                            <strong>Skip Near-Deduplication</strong>
+                            <span>Faster — skips MinHash LSH pass.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="settings-group">
+                    <h3>🤖 Advanced ML Cleaners (Slower)</h3>
+                    
+                    <label class="toggle-checkbox">
+                        <input type="checkbox" name="enable_advanced_pii">
+                        <span class="checkmark"></span>
+                        <div class="label-text">
+                            <strong>Advanced PII (spaCy NER)</strong>
+                            <span>Redacts names, orgs, and locations.</span>
+                        </div>
+                    </label>
+
+                    <label class="toggle-checkbox">
+                        <input type="checkbox" name="enable_ocr">
+                        <span class="checkmark"></span>
+                        <div class="label-text">
+                            <strong>OCR Auto-Correction</strong>
+                            <span>Corrects words like 'awes0me' -> 'awesome'.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <button type="submit" class="primary-btn" id="run-btn">
+                    <span class="btn-text">Run Pipeline</span>
+                    <div class="loader hidden" id="btn-loader"></div>
+                </button>
+            </form>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            <!-- Upload View -->
+            <div id="upload-view" class="view active">
+                <div class="hero-header">
+                    <h1>CorpusForge</h1>
+                    <p>The internet's source for clean, AI-ready text corpora.</p>
+                </div>
+                
+                <div class="dropzone" id="dropzone">
+                    <div class="drop-icon">📁</div>
+                    <h2>Drag & drop files here</h2>
+                    <p>Supports .txt and .pdf files</p>
+                    <input type="file" id="file-input" multiple accept=".txt,.pdf" hidden>
+                    <button class="secondary-btn" onclick="document.getElementById('file-input').click()">Browse Files</button>
+                    
+                    <div id="file-list" class="file-list"></div>
+                </div>
+            </div>
+
+            <!-- Results View -->
+            <div id="results-view" class="view hidden">
+                <div class="results-header">
+                    <h2>Pipeline Complete</h2>
+                    <div class="actions">
+                        <button class="secondary-btn" id="new-run-btn">← New Run</button>
+                        <a id="download-jsonl" class="action-btn" href="#" download>📄 Download .jsonl</a>
+                        <a id="download-zip" class="action-btn primary-glow" href="#" download>📦 Download .zip</a>
+                    </div>
+                </div>
+
+                <div class="results-grid">
+                    <!-- Report Card -->
+                    <div class="report-card">
+                        <h3>Statistical Report</h3>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <span class="stat-value" id="stat-loaded">0</span>
+                                <span class="stat-label">Files Loaded</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value success" id="stat-accepted">0</span>
+                                <span class="stat-label">Accepted</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value error" id="stat-rejected">0</span>
+                                <span class="stat-label">Rejected</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="stat-final">0</span>
+                                <span class="stat-label">Final Corpus</span>
+                            </div>
+                        </div>
+                        <ul class="stat-details">
+                            <li>Exact Duplicates Removed: <strong id="stat-exact">0</strong></li>
+                            <li>Near Duplicates Removed: <strong id="stat-near">0</strong></li>
+                            <li>Acceptance Rate: <strong id="stat-acc-rate">0%</strong></li>
+                            <li>Avg Compression: <strong id="stat-comp">0%</strong></li>
+                        </ul>
+                        
+                        <div id="errors-container" class="hidden">
+                            <h4 class="error-title">Warnings</h4>
+                            <ul id="errors-list" class="error-list"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Preview Card -->
+                    <div class="preview-card">
+                        <div class="preview-header">
+                            <h3>Cleaned Text Preview</h3>
+                            <button id="copy-btn" class="icon-btn" title="Copy to clipboard">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            </button>
+                        </div>
+                        <div class="preview-content">
+                            <pre><code id="preview-text">No preview available.</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

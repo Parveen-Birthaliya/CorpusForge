@@ -233,7 +233,6 @@ Upload `.txt` or `.pdf` files → the 5-stage pipeline runs automatically → do
                             lines=12,
                             max_lines=20,
                             interactive=False,
-                            show_copy_button=True,
                         )
                     with gr.Tab("📈 Report"):
                         report_output = gr.Textbox(
