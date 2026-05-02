@@ -4,48 +4,50 @@ CorpusForge Gradio Web UI.
 Users upload TXT/PDF files → pipeline runs → cleaned JSONL downloads.
 
 Run locally:
-    python -m src.corpusforge.app
-
-Deploy to HuggingFace Spaces:
-    Use app.py at the repo root (see File 2).
+    PYTHONPATH=/path/to/CorpusForge python -m src.corpusforge.app
+    # → open http://localhost:7860
 """
 
 from __future__ import annotations
 
-import json
 import tempfile
 from pathlib import Path
 
 
 def _run_pipeline_on_files(
-    uploaded_files: list[str],
+    uploaded_files,          # Gradio 6 passes list[dict] or list[str] depending on version
     target_lang: str,
     min_chars: int,
     max_rep: float,
     skip_near_dedup: bool,
 ) -> tuple[str, str]:
-    """Run the full pipeline on uploaded files.
-
-    Parameters
-    ----------
-    uploaded_files  : List of file paths provided by Gradio.
-    target_lang     : ISO 639-1 language code.
-    min_chars       : Minimum character count filter.
-    max_rep         : Maximum repetition ratio filter.
-    skip_near_dedup : If True, skip MinHash near-dedup.
+    """Run the full CorpusForge pipeline on uploaded files.
 
     Returns
     -------
-    (jsonl_path, report_text) — path to output file, human-readable report.
+    (jsonl_path, report_text)
     """
     from src.corpusforge.cleaners import HeuristicCleaner
     from src.corpusforge.dedup import Deduplicator
     from src.corpusforge.filters import QualityFilter
     from src.corpusforge.loaders import PdfLoader, TxtLoader
+    from src.corpusforge.models import Document
     from src.corpusforge.output import CorpusFormatter
 
+    # ── Normalise Gradio file input ───────────────────────────────────────
+    # Gradio ≥6 returns a list of dicts with 'path' key (or NamedString).
+    # Older versions return plain file-path strings.
     if not uploaded_files:
         return "", "❌ No files uploaded."
+
+    file_paths: list[Path] = []
+    for f in uploaded_files:
+        if isinstance(f, dict):
+            file_paths.append(Path(f["path"]))
+        elif hasattr(f, "name"):          # NamedString / TemporaryFile
+            file_paths.append(Path(f.name))
+        else:
+            file_paths.append(Path(str(f)))
 
     loaders      = [TxtLoader(), PdfLoader()]
     cleaner      = HeuristicCleaner()
@@ -56,74 +58,76 @@ def _run_pipeline_on_files(
     )
     deduplicator = Deduplicator(skip_near=skip_near_dedup)
 
-    # Use a temp dir for output
-    out_dir = Path(tempfile.mkdtemp())
+    out_dir   = Path(tempfile.mkdtemp())
     formatter = CorpusFormatter(out_dir)
 
-    # ── Load ──────────────────────────────────────────────────────────────
-    from src.corpusforge.models import Document
-    docs: list[Document] = []
-    errors: list[str]    = []
+    # ── Stage 1: Load ────────────────────────────────────────────────────
+    docs:   list[Document] = []
+    errors: list[str]      = []
 
-    for fpath_str in uploaded_files:
-        fpath = Path(fpath_str)
+    for fpath in file_paths:
+        handled = False
         for loader in loaders:
             if loader.can_handle(fpath):
+                handled = True
                 try:
                     docs.append(loader.load(fpath))
                 except Exception as exc:
                     errors.append(f"• {fpath.name}: {exc}")
                 break
+        if not handled:
+            errors.append(f"• {fpath.name}: unsupported format")
 
     if not docs:
-        return "", f"❌ No files could be loaded.\n" + "\n".join(errors)
+        msg = "❌ No files could be loaded."
+        if errors:
+            msg += "\n\nErrors:\n" + "\n".join(errors)
+        return "", msg
 
-    # ── Clean ─────────────────────────────────────────────────────────────
+    # ── Stage 2: Clean ───────────────────────────────────────────────────
     cleaning_results = [cleaner.clean(doc) for doc in docs]
 
-    # ── Filter ────────────────────────────────────────────────────────────
+    # ── Stage 3: Filter ──────────────────────────────────────────────────
     filter_results = [quality.evaluate(cr) for cr in cleaning_results]
-    accepted       = [fr for fr in filter_results if fr.status == "accept"]
-    texts          = {
+    accepted = [fr for fr in filter_results if fr.status == "accept"]
+    texts = {
         cr.doc_id: cr.cleaned_text
         for cr, fr in zip(cleaning_results, filter_results)
         if fr.status == "accept"
     }
 
-    # ── Dedup ─────────────────────────────────────────────────────────────
+    # ── Stage 4: Dedup ───────────────────────────────────────────────────
     dedup_result = deduplicator.run(accepted, texts)
 
-    # ── Output ────────────────────────────────────────────────────────────
+    # ── Stage 5: Output ──────────────────────────────────────────────────
     source_paths = {doc.doc_id: str(doc.source_path) for doc in docs}
-    report       = formatter.write(
-        cleaning_results, filter_results, dedup_result, source_paths
-    )
+    report = formatter.write(cleaning_results, filter_results, dedup_result, source_paths)
 
     jsonl_path = str(out_dir / "cleaned_corpus.jsonl")
 
     # ── Human-readable report ─────────────────────────────────────────────
-    report_lines = [
+    lines = [
         "✅  Pipeline complete!",
-        "─" * 38,
-        f"Files loaded      : {report.total_loaded}",
-        f"Accepted          : {report.total_accepted}  ({report.acceptance_rate:.1%})",
-        f"Rejected          : {report.total_rejected}",
-        f"Exact duplicates  : {report.exact_removed}",
-        f"Near  duplicates  : {report.near_removed}",
-        f"Final corpus size : {report.total_after_dedup} documents",
-        f"Avg compression   : {report.avg_compression:.1%}",
-        "─" * 38,
+        "─" * 42,
+        f"  Files loaded       :  {report.total_loaded}",
+        f"  Accepted           :  {report.total_accepted}  ({report.acceptance_rate:.1%})",
+        f"  Rejected           :  {report.total_rejected}",
+        f"  Exact duplicates   :  {report.exact_removed}",
+        f"  Near  duplicates   :  {report.near_removed}",
+        f"  Final corpus size  :  {report.total_after_dedup} documents",
+        f"  Avg compression    :  {report.avg_compression:.1%}",
+        "─" * 42,
     ]
 
     if errors:
-        report_lines += ["", "⚠️  Load errors:"] + errors
+        lines += ["", "⚠️  Load warnings:"] + errors
 
     if report.reject_reasons:
-        report_lines += ["", "Rejection breakdown:"]
-        for reason, count in report.reject_reasons.items():
-            report_lines.append(f"  {reason:12s} : {count}")
+        lines += ["", "  Rejection breakdown:"]
+        for reason, count in sorted(report.reject_reasons.items(), key=lambda x: -x[1]):
+            lines.append(f"    {reason:<16} : {count}")
 
-    return jsonl_path, "\n".join(report_lines)
+    return jsonl_path, "\n".join(lines)
 
 
 def create_ui():
@@ -133,69 +137,81 @@ def create_ui():
     except ImportError as exc:
         raise ImportError(
             "Gradio is required for the web UI.\n"
-            "Install: pip install gradio"
+            "Install: pip install 'gradio>=4.15'"
         ) from exc
 
-    with gr.Blocks(
-        title="CorpusForge — Corpus Cleaner",
-        theme=gr.themes.Soft(),
-    ) as demo:
+    with gr.Blocks(title="CorpusForge — Corpus Cleaner") as demo:
 
         gr.Markdown(
             """
-            # 🔧 CorpusForge
-            **Clean messy text corpora for AI applications.**
+# ⚡ CorpusForge
+**Clean messy text corpora for AI/NLP pipelines.**
 
-            Upload TXT or PDF files → download a clean JSONL corpus.
-            """
+Upload `.txt` or `.pdf` files → the 5-stage pipeline runs automatically → download your cleaned JSONL corpus.
+
+> **Pipeline:** Load → Heuristic Clean → Quality Filter → Deduplication (MD5 + MinHash) → Export
+"""
         )
 
-        with gr.Row():
+        with gr.Row(equal_height=False):
+            # ── LEFT COLUMN: Input ────────────────────────────────────────
             with gr.Column(scale=1):
-                gr.Markdown("### 📂 Input")
+                gr.Markdown("### 📂 Upload Files")
                 file_input = gr.File(
-                    label="Upload files (TXT, PDF)",
+                    label="Drop files here (TXT · PDF)",
                     file_count="multiple",
                     file_types=[".txt", ".pdf"],
                 )
 
-                gr.Markdown("### ⚙️ Settings")
-                lang_input = gr.Dropdown(
-                    choices=["en", "fr", "de", "es", "it", "pt", "nl", "ru", "zh", "ja"],
-                    value="en",
-                    label="Target language",
-                )
-                min_chars_input = gr.Slider(
-                    minimum=0,
-                    maximum=1000,
-                    value=100,
-                    step=50,
-                    label="Minimum characters (after cleaning)",
-                )
-                max_rep_input = gr.Slider(
-                    minimum=0.0,
-                    maximum=1.0,
-                    value=0.20,
-                    step=0.05,
-                    label="Max repetition ratio",
-                )
-                skip_near_input = gr.Checkbox(
-                    value=False,
-                    label="Skip near-dedup (faster, less thorough)",
-                )
-                run_btn = gr.Button("🚀 Run Pipeline", variant="primary")
+                with gr.Accordion("⚙️ Pipeline Settings", open=True):
+                    lang_input = gr.Dropdown(
+                        choices=["en", "fr", "de", "es", "it", "pt", "nl", "ru", "zh", "ja"],
+                        value="en",
+                        label="🌐 Target Language",
+                        info="Documents not matching this language will be rejected.",
+                    )
+                    min_chars_input = gr.Slider(
+                        minimum=0,
+                        maximum=1000,
+                        value=100,
+                        step=50,
+                        label="📏 Minimum Characters",
+                        info="Documents shorter than this (after cleaning) are rejected.",
+                    )
+                    max_rep_input = gr.Slider(
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=0.20,
+                        step=0.05,
+                        label="🔁 Max Repetition Ratio",
+                        info="Documents with more repetition than this are rejected.",
+                    )
+                    skip_near_input = gr.Checkbox(
+                        value=False,
+                        label="⚡ Skip Near-Deduplication (MinHash)",
+                        info="Faster — skips the MinHash LSH near-dedup pass.",
+                    )
 
+                with gr.Row():
+                    run_btn   = gr.Button("🚀 Run Pipeline", variant="primary", scale=3)
+                    clear_btn = gr.ClearButton(scale=1)
+
+            # ── RIGHT COLUMN: Results ─────────────────────────────────────
             with gr.Column(scale=1):
                 gr.Markdown("### 📊 Results")
                 report_output = gr.Textbox(
-                    label="Pipeline report",
-                    lines=20,
+                    label="Pipeline Report",
+                    lines=22,
+                    max_lines=30,
                     interactive=False,
+                    placeholder="Run the pipeline to see results here…",
                 )
                 file_output = gr.File(
-                    label="Download cleaned_corpus.jsonl",
+                    label="⬇️ Download cleaned_corpus.jsonl",
+                    interactive=False,
                 )
 
+        # ── Wire up events ────────────────────────────────────────────────
         run_btn.click(
             fn=_run_pipeline_on_files,
             inputs=[
@@ -208,21 +224,32 @@ def create_ui():
             outputs=[file_output, report_output],
         )
 
+        clear_btn.add([file_input, report_output, file_output])
+
+        # ── Footer ────────────────────────────────────────────────────────
         gr.Markdown(
             """
-            ---
-            **CorpusForge** — open-source corpus cleaning pipeline.
-            [GitHub](https://github.com/your-username/CorpusForge)
-            """
+---
+**CorpusForge v0.1.0** — 8-component NLP corpus cleaning pipeline.  
+Components: `Loaders` · `HeuristicCleaner` · `QualityFilter` · `Deduplicator` · `CorpusFormatter` · `CLI` · `Web UI`
+"""
         )
 
     return demo
 
 
 def main() -> None:
-    """Entry point for local development."""
+    """Entry point — run with: PYTHONPATH=. python -m src.corpusforge.app"""
+    import gradio as gr
+
     demo = create_ui()
-    demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=False,
+        theme=gr.themes.Soft(),
+        show_error=True,       # surface Python tracebacks in the UI
+    )
 
 
 if __name__ == "__main__":

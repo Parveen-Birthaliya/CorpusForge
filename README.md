@@ -43,11 +43,32 @@ pip install -e ".[dev]"
 
 While the CLI is under development, you can use CorpusForge programmatically:
 
+## Quick Start
+
+You can use CorpusForge in three ways:
+
+### 1. Web UI (Gradio)
+The easiest way to use the pipeline interactively.
+```bash
+# Launch the Web UI locally
+python -m src.corpusforge.app
+```
+Then open `http://localhost:7860` in your browser.
+
+### 2. Command Line Interface (CLI)
+For batch processing directories.
+```bash
+# Set PYTHONPATH if needed, then run the CLI module
+PYTHONPATH=. python -m src.corpusforge.cli --input data/raw --output data/cleaned --lang en
+```
+
+### 3. Python API
+Integrate the pipeline into your own scripts.
 ```python
 from pathlib import Path
-from corpusforge.loaders import TxtLoader, PdfLoader
-from corpusforge.cleaners import HeuristicCleaner
-from corpusforge.filters import QualityFilter
+from src.corpusforge.loaders import PdfLoader
+from src.corpusforge.cleaners import HeuristicCleaner
+from src.corpusforge.filters import QualityFilter
 
 # 1. Load document
 loader = PdfLoader()
@@ -63,14 +84,13 @@ filter_result = quality_gate.evaluate(clean_result)
 
 if filter_result.status == "accept":
     print("Document passed all quality gates!")
-    print(clean_result.cleaned_text)
 else:
     print(f"Rejected: {filter_result.reject_reason}")
 ```
 
 ## Project Roadmap
 
-We are building CorpusForge component by component. Here is the current progress:
+We have built CorpusForge component by component. The pipeline is now **100% complete**:
 
 | Component | Description | Status |
 | :--- | :--- | :--- |

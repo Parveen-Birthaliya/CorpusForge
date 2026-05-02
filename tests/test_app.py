@@ -1,16 +1,14 @@
 """
 Tests for corpusforge.app (Gradio UI backend).
 
-Note: We test _run_pipeline_on_files() directly — no browser needed.
+We test _run_pipeline_on_files() directly — no browser needed.
+The function now accepts both plain path strings and Gradio-6 dict format.
 
 Run: pytest tests/test_app.py -v
 """
 
-import pytest
 from pathlib import Path
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────
+import pytest
 
 SAMPLE_TEXT = (
     "Natural language processing enables computers to understand human "
@@ -20,52 +18,59 @@ SAMPLE_TEXT = (
 )
 
 
+# ── Fixtures ──────────────────────────────────────────────────────────────
+
 @pytest.fixture
 def txt_file(tmp_path: Path) -> str:
-    """A valid TXT file. Returns path as string (Gradio's format)."""
     f = tmp_path / "sample.txt"
     f.write_text(SAMPLE_TEXT, encoding="utf-8")
     return str(f)
 
 
 @pytest.fixture
+def txt_file_as_dict(tmp_path: Path) -> dict:
+    """Simulate Gradio-6 file dict format."""
+    f = tmp_path / "sample_dict.txt"
+    f.write_text(SAMPLE_TEXT, encoding="utf-8")
+    return {"path": str(f), "name": f.name, "size": f.stat().st_size}
+
+
+@pytest.fixture
 def noisy_file(tmp_path: Path) -> str:
     f = tmp_path / "noisy.txt"
-    f.write_text("Hi.\x00\x00", encoding="utf-8")  # too short after cleaning
+    f.write_text("Hi.\x00\x00", encoding="utf-8")
     return str(f)
 
 
 def run(files, lang="en", min_chars=50, max_rep=0.80, skip_near=True):
-    """Convenience wrapper for _run_pipeline_on_files."""
     from src.corpusforge.app import _run_pipeline_on_files
     return _run_pipeline_on_files(files, lang, min_chars, max_rep, skip_near)
 
 
 # ═════════════════════════════════════════════════════════════════════════
-# _run_pipeline_on_files
+# _run_pipeline_on_files — plain string paths
 # ═════════════════════════════════════════════════════════════════════════
 
 class TestRunPipelineOnFiles:
 
-    def test_empty_input_returns_error(self) -> None:
-        jsonl_path, report = run([])
-        assert jsonl_path == ""
+    def test_empty_input_returns_error(self):
+        path, report = run([])
+        assert path == ""
         assert "❌" in report
 
-    def test_returns_two_values(self, txt_file: str) -> None:
-        result = run([txt_file])
-        assert len(result) == 2
+    def test_returns_two_values(self, txt_file):
+        assert len(run([txt_file])) == 2
 
-    def test_success_report_contains_checkmark(self, txt_file: str) -> None:
+    def test_success_report_contains_checkmark(self, txt_file):
         _, report = run([txt_file])
         assert "✅" in report
 
-    def test_creates_jsonl_file(self, txt_file: str) -> None:
+    def test_creates_jsonl_file(self, txt_file):
         jsonl_path, _ = run([txt_file])
         assert jsonl_path != ""
         assert Path(jsonl_path).exists()
 
-    def test_jsonl_has_valid_records(self, txt_file: str) -> None:
+    def test_jsonl_has_valid_records(self, txt_file):
         import json
         jsonl_path, _ = run([txt_file])
         lines = Path(jsonl_path).read_text(encoding="utf-8").strip().splitlines()
@@ -75,43 +80,56 @@ class TestRunPipelineOnFiles:
         assert "text"        in record
         assert "format_type" in record
 
-    def test_report_contains_total_loaded(self, txt_file: str) -> None:
+    def test_report_contains_total_loaded(self, txt_file):
         _, report = run([txt_file])
         assert "Files loaded" in report
 
-    def test_short_file_filtered_out(self, noisy_file: str) -> None:
+    def test_short_file_filtered_out(self, noisy_file):
         _, report = run([noisy_file], min_chars=100)
-        # Should reject (too short / noisy)
         assert "Accepted" in report
 
-    def test_nonexistent_file_handled(self, tmp_path: Path) -> None:
+    def test_nonexistent_file_handled(self, tmp_path):
         fake = str(tmp_path / "ghost.txt")
         jsonl_path, report = run([fake])
-        # Should fail gracefully
         assert "❌" in report or jsonl_path == "" or "error" in report.lower()
 
-    def test_multiple_files(self, tmp_path: Path) -> None:
+    def test_multiple_files(self, tmp_path):
         files = []
         for i in range(3):
             f = tmp_path / f"doc{i}.txt"
             f.write_text(SAMPLE_TEXT + f" Document {i}.", encoding="utf-8")
             files.append(str(f))
         jsonl_path, report = run(files)
-        assert "3" in report   # 3 files loaded
+        assert "3" in report
 
-    def test_custom_lang_reflected(self, txt_file: str) -> None:
-        # English text with lang=fr → all rejected
+    def test_custom_lang_reflected(self, txt_file):
         _, report = run([txt_file], lang="fr")
-        assert "0" in report or "Accepted" in report
+        assert "Accepted" in report
 
 
 # ═════════════════════════════════════════════════════════════════════════
-# create_ui (smoke test — checks Gradio import and build)
+# Gradio-6 dict format
+# ═════════════════════════════════════════════════════════════════════════
+
+class TestGradio6DictFormat:
+
+    def test_dict_format_works(self, txt_file_as_dict):
+        jsonl_path, report = run([txt_file_as_dict])
+        assert "✅" in report or "Accepted" in report
+
+    def test_dict_format_creates_jsonl(self, txt_file_as_dict):
+        jsonl_path, _ = run([txt_file_as_dict])
+        assert jsonl_path != ""
+        assert Path(jsonl_path).exists()
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# create_ui smoke test
 # ═════════════════════════════════════════════════════════════════════════
 
 class TestCreateUi:
 
-    def test_returns_gradio_blocks(self) -> None:
+    def test_returns_gradio_blocks(self):
         try:
             import gradio as gr
         except ImportError:
