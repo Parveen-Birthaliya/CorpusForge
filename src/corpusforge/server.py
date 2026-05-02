@@ -28,15 +28,18 @@ app = FastAPI(title="CorpusForge API")
 @app.post("/api/clean")
 async def clean_corpus(
     files: List[UploadFile] = File(...),
-    target_lang: str = Form("en"),
-    min_chars: int = Form(100),
-    max_rep: float = Form(0.20),
-    skip_near_dedup: bool = Form(False),
-    enable_advanced_pii: bool = Form(False),
-    enable_ocr: bool = Form(False),
 ):
     """Run the CorpusForge pipeline on uploaded files."""
-    
+
+    # Hardcoded defaults — sidebar settings removed from UI
+    # Advanced ML cleaners are ALWAYS ON (no UI toggle needed)
+    target_lang         = "en"
+    min_chars           = 100
+    max_rep             = 0.20
+    skip_near_dedup     = False
+    enable_advanced_pii = True   # spaCy NER — always redact PII
+    enable_ocr          = True   # SymSpell OCR correction — always on
+
     # ── Stage 0: Save uploaded files to temp directory ────────────────────
     input_dir = Path(tempfile.mkdtemp(prefix="corpusforge_in_"))
     file_paths: list[Path] = []
@@ -104,34 +107,66 @@ async def clean_corpus(
     shutil.make_archive(zip_path, 'zip', out_dir)
     final_zip_name = "corpusforge_results.zip"
     
-    # Extract preview text
-    preview_text = ""
-    if texts:
-        first_doc_id = list(texts.keys())[0]
-        preview_text = texts[first_doc_id]
-        if len(preview_text) > 3000:
-            preview_text = preview_text[:3000] + "\n\n... (truncated for preview)"
+    # ── Build preview / inspection data ──────────────────────────────────
+    raw_preview     = ""
+    cleaned_preview = ""
+    garbage_lines   = []
 
-    # Build response payload
-    response_data = {
-        "status": "success",
-        "preview_text": preview_text,
+    # Always use the FIRST document for the Before/After view
+    if cleaning_results:
+        first_cr  = cleaning_results[0]
+        first_doc = next((d for d in docs if d.doc_id == first_cr.doc_id), None)
+
+        raw_full     = (first_doc.text if first_doc else "").strip()
+        cleaned_full = first_cr.cleaned_text.strip()
+
+        LIMIT = 5000
+        raw_preview     = raw_full[:LIMIT]     + ("\n\n…(truncated)" if len(raw_full)     > LIMIT else "")
+        cleaned_preview = cleaned_full[:LIMIT]  + ("\n\n…(truncated)" if len(cleaned_full) > LIMIT else "")
+
+        # Garbage = lines in raw that vanished after cleaning
+        cleaned_line_set = {ln.strip() for ln in cleaned_full.splitlines() if ln.strip()}
+        for line in raw_full.splitlines():
+            stripped = line.strip()
+            if stripped and stripped not in cleaned_line_set:
+                garbage_lines.append(stripped)
+                if len(garbage_lines) >= 100:
+                    break
+
+    # Duplicates: collect removed doc snippets from the correct list field
+    duplicate_previews = []
+    removed_ids = getattr(dedup_result, "removed_ids", [])
+    for doc_id in removed_ids:
+        orig = next((d for d in docs if d.doc_id == doc_id), None)
+        if orig:
+            duplicate_previews.append({
+                "id":   doc_id,
+                "text": orig.text[:500] + ("…" if len(orig.text) > 500 else ""),
+            })
+        if len(duplicate_previews) >= 10:
+            break
+
+    # ── Final response ────────────────────────────────────────────────────
+    return JSONResponse(content={
+        "status":             "success",
+        "raw_preview":        raw_preview,
+        "cleaned_preview":    cleaned_preview,
+        "garbage_lines":      garbage_lines,
+        "duplicate_previews": duplicate_previews,
         "report": {
-            "total_loaded": report.total_loaded,
-            "total_accepted": report.total_accepted,
-            "total_rejected": report.total_rejected,
-            "exact_removed": report.exact_removed,
-            "near_removed": report.near_removed,
+            "total_loaded":      report.total_loaded,
+            "total_accepted":    report.total_accepted,
+            "total_rejected":    report.total_rejected,
+            "exact_removed":     report.exact_removed,
+            "near_removed":      report.near_removed,
             "total_after_dedup": report.total_after_dedup,
-            "acceptance_rate": f"{report.acceptance_rate:.1%}",
-            "avg_compression": f"{report.avg_compression:.1%}",
+            "acceptance_rate":   f"{report.acceptance_rate:.1%}",
+            "avg_compression":   f"{report.avg_compression:.1%}",
         },
-        "errors": errors,
-        "download_zip_url": f"/api/download/{out_dir.name}/{final_zip_name}",
-        "download_jsonl_url": f"/api/download/{out_dir.name}/cleaned_corpus.jsonl"
-    }
-
-    return JSONResponse(content=response_data)
+        "errors":             errors,
+        "download_zip_url":   f"/api/download/{out_dir.name}/{final_zip_name}",
+        "download_jsonl_url": f"/api/download/{out_dir.name}/cleaned_corpus.jsonl",
+    })
 
 
 @app.get("/api/download/{folder}/{filename}")

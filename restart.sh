@@ -3,15 +3,16 @@
 # Navigate to the project directory
 cd "$(dirname "$0")" || exit
 
-echo "🛑 Stopping any running Gradio servers..."
+echo "🛑 Stopping any running servers..."
 pkill -f "src.corpusforge.app" || true
+pkill -f "src.corpusforge.server:app" || true
 sleep 1
 
-echo "🟢 Starting Gradio server..."
+echo "🟢 Starting FastAPI server..."
 # Activate virtual environment if it exists
 if [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
 # Run the app
-PYTHONPATH=. python -m src.corpusforge.app
+PYTHONPATH=. uvicorn src.corpusforge.server:app --host 0.0.0.0 --port 7860
