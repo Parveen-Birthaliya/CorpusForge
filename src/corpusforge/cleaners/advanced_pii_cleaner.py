@@ -34,7 +34,18 @@ class AdvancedPiiCleaner:
         replacements = []
         for ent in doc.ents:
             if ent.label_ in ("PERSON", "ORG", "GPE"):
-                replacements.append((ent.start_char, ent.end_char, f"[{ent.label_}]"))
+                start = ent.start_char
+                end = ent.end_char
+                text_slice = text[start:end]
+                
+                l_strip_len = len(text_slice) - len(text_slice.lstrip())
+                r_strip_len = len(text_slice) - len(text_slice.rstrip())
+                
+                real_start = start + l_strip_len
+                real_end = end - r_strip_len
+                
+                if real_start < real_end:
+                    replacements.append((real_start, real_end, f"[{ent.label_}]"))
                 
         # Sort in reverse order by start_char
         replacements.sort(key=lambda x: x[0], reverse=True)
