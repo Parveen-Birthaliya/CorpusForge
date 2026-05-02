@@ -78,9 +78,9 @@ We are building CorpusForge component by component. Here is the current progress
 | **02** | Input Loaders (TXT, PDF) | ✅ Done |
 | **03** | Heuristic Text Cleaner | ✅ Done |
 | **04** | Quality Gate Filters | ✅ Done |
-| **05** | Exact & Near Deduplication (MinHash) | 🔜 Next |
-| **06** | Output Formatter (JSONL) | ⬜ Planned |
-| **07** | Command Line Interface (CLI) | ⬜ Planned |
+| **05** | Exact & Near Deduplication (MinHash) | ✅ Done |
+| **06** | Output Formatter (JSONL) | ✅ Done |
+| **07** | Command Line Interface (CLI) | 🔜 Next |
 | **08** | Web UI (Gradio) | ⬜ Planned |
 
 ## License
