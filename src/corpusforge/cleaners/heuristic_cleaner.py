@@ -13,6 +13,8 @@ from src.corpusforge.cleaners.whitespace_cleaner import (
 )
 from src.corpusforge.cleaners.structural_cleaner import remove_structural_noise
 from src.corpusforge.cleaners.intra_dedup import remove_intra_doc_duplicates
+from src.corpusforge.cleaners.advanced_pii_cleaner import AdvancedPiiCleaner
+from src.corpusforge.cleaners.ocr_cleaner import OcrCleaner
 
 
 @dataclass
@@ -40,8 +42,13 @@ class CleaningResult:
 
 class HeuristicCleaner:
     """
-    Rule-based text cleaner. No ML, no models — pure heuristics.
+    Text cleaner pipeline.
+    Combines fast regex heuristics with optional advanced ML cleaners (NER, OCR).
     """
+
+    def __init__(self, enable_advanced_pii: bool = False, enable_ocr: bool = False):
+        self.advanced_pii = AdvancedPiiCleaner(enable=enable_advanced_pii)
+        self.ocr = OcrCleaner(enable=enable_ocr)
 
     def clean(self, doc: Document) -> CleaningResult:
         """Clean a Document and return a CleaningResult.
@@ -65,10 +72,14 @@ class HeuristicCleaner:
         text = remove_page_markers(text)
         text = remove_structural_noise(text)
         
-        # Step 5 — Intra-document Deduplication
+        # Step 5 — Advanced ML Cleaners (Optional)
+        text = self.advanced_pii.redact_pii(text)
+        text = self.ocr.correct_ocr_artifacts(text)
+        
+        # Step 6 — Intra-document Deduplication
         text = remove_intra_doc_duplicates(text)
 
-        # Step 6 — Whitespace (must be last to collapse everything)
+        # Step 7 — Whitespace (must be last to collapse everything)
         text = normalise_whitespace(text)
 
         return CleaningResult(
