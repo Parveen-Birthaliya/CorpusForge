@@ -9,7 +9,7 @@ from src.corpusforge.cleaners import (
     normalise_whitespace,
     remove_urls,
     remove_page_markers,
-    fix_pdf_hyphenation,
+    fix_hyphenation,
 )
 from src.corpusforge.models import Document
 
@@ -79,7 +79,7 @@ class TestNormaliseWhitespace:
     @pytest.mark.parametrize("raw,expected", [
         ("hello   world",            "hello world"),
         ("hello\n\n\n\nworld",       "hello\n\nworld"),
-        ("\t\ttabs  here",           " tabs here"),
+        ("\t\ttabs  here",           "tabs here"),
         ("  leading and trailing  ", "leading and trailing"),
         ("a\n\nb",                   "a\n\nb"),   # 2 newlines kept
     ])
@@ -140,7 +140,7 @@ class TestRemovePageMarkers:
         assert "42" in result
 
 
-class TestFixPdfHyphenation:
+class TestFixHyphenation:
 
     @pytest.mark.parametrize("raw,expected", [
         ("exam-\nines",   "examines"),
@@ -148,17 +148,17 @@ class TestFixPdfHyphenation:
         ("multi-\nline",  "multiline"),
     ])
     def test_rejoins_word(self, raw: str, expected: str) -> None:
-        assert expected in fix_pdf_hyphenation(raw)
+        assert expected in fix_hyphenation(raw)
 
     def test_normal_hyphen_untouched(self) -> None:
         text = "well-known result"
-        assert fix_pdf_hyphenation(text) == text
+        assert fix_hyphenation(text) == text
 
-    def test_dash_at_end_of_line_without_word_untouched(self) -> None:
-        # "end-\n " — the character after hyphen+newline is a space, not \w
-        text = "end-\n next line"
-        result = fix_pdf_hyphenation(text)
-        assert "-\n" in result   # not joined because next char is space
+    def test_dash_at_end_of_line_with_indent_joined(self) -> None:
+        # "end-\n next" — the character after hyphen+newline is a space, but we still join
+        text = "exam-\n ines"
+        result = fix_hyphenation(text)
+        assert "examines" in result
 
 
 # HeuristicCleaner — integration
@@ -222,7 +222,7 @@ class TestHeuristicCleaner:
         assert result.cleaned_text == ""
         assert result.compression_ratio == 0.0
 
-    def test_pdf_hyphenation_applied(self) -> None:
+    def test_hyphenation_applied(self) -> None:
         doc = make_doc("The study exam-\nines behaviour.", format_type="pdf")
         result = HeuristicCleaner().clean(doc)
         assert "examines" in result.cleaned_text

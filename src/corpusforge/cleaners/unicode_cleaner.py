@@ -11,8 +11,10 @@ def normalise_unicode(text: str) -> str:
 
 
 def remove_control_characters(text: str) -> str:
-    """Strip non-printable control characters.
-    """
+    """Strip non-printable control characters and stray BOMs."""
+    # Remove literal string BOMs often caused by bad JSON extraction
+    text = text.replace(r"\ufeff", "").replace(r"\ufffe", "")
+    
     return "".join(
         c for c in text
         if unicodedata.category(c) not in _REMOVE_CATEGORIES

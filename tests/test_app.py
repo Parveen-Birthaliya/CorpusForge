@@ -66,19 +66,25 @@ class TestRunPipelineOnFiles:
         assert "✅" in report
 
     def test_creates_jsonl_file(self, txt_file):
-        jsonl_path, _ = run([txt_file])
-        assert jsonl_path != ""
-        assert Path(jsonl_path).exists()
+        zip_path, _ = run([txt_file])
+        assert zip_path != ""
+        assert zip_path.endswith(".zip")
+        assert Path(zip_path).exists()
 
     def test_jsonl_has_valid_records(self, txt_file):
         import json
-        jsonl_path, _ = run([txt_file])
-        lines = Path(jsonl_path).read_text(encoding="utf-8").strip().splitlines()
-        assert len(lines) >= 1
-        record = json.loads(lines[0])
-        assert "doc_id"      in record
-        assert "text"        in record
-        assert "format_type" in record
+        import zipfile
+        zip_path, _ = run([txt_file])
+        
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            assert "cleaned_corpus.jsonl" in z.namelist()
+            with z.open("cleaned_corpus.jsonl") as f:
+                lines = f.read().decode("utf-8").strip().splitlines()
+                assert len(lines) >= 1
+                record = json.loads(lines[0])
+                assert "doc_id"      in record
+                assert "text"        in record
+                assert "format_type" in record
 
     def test_report_contains_total_loaded(self, txt_file):
         _, report = run([txt_file])
@@ -90,8 +96,8 @@ class TestRunPipelineOnFiles:
 
     def test_nonexistent_file_handled(self, tmp_path):
         fake = str(tmp_path / "ghost.txt")
-        jsonl_path, report = run([fake])
-        assert "❌" in report or jsonl_path == "" or "error" in report.lower()
+        zip_path, report = run([fake])
+        assert "❌" in report or zip_path == "" or "error" in report.lower()
 
     def test_multiple_files(self, tmp_path):
         files = []
@@ -99,7 +105,7 @@ class TestRunPipelineOnFiles:
             f = tmp_path / f"doc{i}.txt"
             f.write_text(SAMPLE_TEXT + f" Document {i}.", encoding="utf-8")
             files.append(str(f))
-        jsonl_path, report = run(files)
+        zip_path, report = run(files)
         assert "3" in report
 
     def test_custom_lang_reflected(self, txt_file):
@@ -118,9 +124,9 @@ class TestGradio6DictFormat:
         assert "✅" in report or "Accepted" in report
 
     def test_dict_format_creates_jsonl(self, txt_file_as_dict):
-        jsonl_path, _ = run([txt_file_as_dict])
-        assert jsonl_path != ""
-        assert Path(jsonl_path).exists()
+        zip_path, _ = run([txt_file_as_dict])
+        assert zip_path != ""
+        assert Path(zip_path).exists()
 
 
 # ═════════════════════════════════════════════════════════════════════════

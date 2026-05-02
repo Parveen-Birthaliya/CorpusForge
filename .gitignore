@@ -9,34 +9,40 @@ venv/
 .venv/
 env/
 
-#  Packaging 
+# Packaging
 *.egg-info/
 dist/
 build/
 
-# Testing & Coverage 
+# Testing & Coverage
 .pytest_cache/
 .coverage*
 htmlcov/
+.tox/
 
-# Logs 
+# Logs
 logs/
 *.log
 
-#  Data 
+# Data
 data/raw/*
 data/cleaned/*
 !data/raw/.gitkeep
 !data/cleaned/.gitkeep
 
-# ML Experiments 
+# Gradio / Local UI Temp Files
+flagged/
+gradio_cached_examples/
+
+# ML Experiments
 mlruns/
 wandb/
 
 # Environment Variables
+.env
 .env.local
 
-# IDE / OS 
+# IDE / OS
 .vscode/
 .idea/
 .DS_Store
@@ -44,5 +50,5 @@ Thumbs.db
 *.swp
 *.swo
 
-# Python Version 
+# Python Version
 .python-version

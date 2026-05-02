@@ -103,7 +103,10 @@ def _run_pipeline_on_files(
     source_paths = {doc.doc_id: str(doc.source_path) for doc in docs}
     report = formatter.write(cleaning_results, filter_results, dedup_result, source_paths)
 
-    jsonl_path = str(out_dir / "cleaned_corpus.jsonl")
+    import shutil
+    zip_path = str(out_dir / "corpusforge_results")
+    shutil.make_archive(zip_path, 'zip', out_dir)
+    final_output_path = f"{zip_path}.zip"
 
     # ── Human-readable report ─────────────────────────────────────────────
     lines = [
@@ -127,7 +130,7 @@ def _run_pipeline_on_files(
         for reason, count in sorted(report.reject_reasons.items(), key=lambda x: -x[1]):
             lines.append(f"    {reason:<16} : {count}")
 
-    return jsonl_path, "\n".join(lines)
+    return final_output_path, "\n".join(lines)
 
 
 def create_ui():
@@ -147,7 +150,7 @@ def create_ui():
 # ⚡ CorpusForge
 **Clean messy text corpora for AI/NLP pipelines.**
 
-Upload `.txt` or `.pdf` files → the 5-stage pipeline runs automatically → download your cleaned JSONL corpus.
+Upload `.txt` or `.pdf` files → the 5-stage pipeline runs automatically → download a ZIP archive with your cleaned `.txt` files.
 
 > **Pipeline:** Load → Heuristic Clean → Quality Filter → Deduplication (MD5 + MinHash) → Export
 """
@@ -207,7 +210,7 @@ Upload `.txt` or `.pdf` files → the 5-stage pipeline runs automatically → do
                     placeholder="Run the pipeline to see results here…",
                 )
                 file_output = gr.File(
-                    label="⬇️ Download cleaned_corpus.jsonl",
+                    label="⬇️ Download corpusforge_results.zip",
                     interactive=False,
                 )
 

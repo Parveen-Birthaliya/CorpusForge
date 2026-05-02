@@ -114,6 +114,12 @@ class CorpusFormatter:
                     "source_path": source_paths.get(doc_id, ""),
                 }
                 fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+                
+                # Write individual cleaned text file
+                txt_dir = self.output_dir / "cleaned_texts"
+                txt_dir.mkdir(exist_ok=True)
+                (txt_dir / f"{doc_id}.txt").write_text(cr.cleaned_text, encoding="utf-8")
+                
                 written += 1
 
         # ── Build report ─────────────────────────────────────────────────

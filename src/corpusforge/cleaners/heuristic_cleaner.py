@@ -9,8 +9,10 @@ from src.corpusforge.cleaners.whitespace_cleaner import (
     normalise_whitespace,
     remove_urls,
     remove_page_markers,
-    fix_pdf_hyphenation,
+    fix_hyphenation,
 )
+from src.corpusforge.cleaners.structural_cleaner import remove_structural_noise
+from src.corpusforge.cleaners.intra_dedup import remove_intra_doc_duplicates
 
 
 @dataclass
@@ -53,19 +55,21 @@ class HeuristicCleaner:
         # Step 2 — Control characters
         text = remove_control_characters(text)
 
-        # Step 3 — Format-specific
-        if doc.format_type == "pdf":
-            text = fix_pdf_hyphenation(text)
-        elif doc.format_type == "txt":
+        # Step 3 — Format-specific & Hyphenation
+        text = fix_hyphenation(text)
+        if doc.format_type == "txt":
             text = text.replace("\r\n", "\n")   # Windows line endings
-        # Step 4 — URLs
+            
+        # Step 4 — URLs & Structural Noise
         text = remove_urls(text)
-
-        # Step 5 — Whitespace (must be last)
-        text = normalise_whitespace(text)
-
-        # Step 6 — THEN remove page markers
         text = remove_page_markers(text)
+        text = remove_structural_noise(text)
+        
+        # Step 5 — Intra-document Deduplication
+        text = remove_intra_doc_duplicates(text)
+
+        # Step 6 — Whitespace (must be last to collapse everything)
+        text = normalise_whitespace(text)
 
         return CleaningResult(
             doc_id=doc.doc_id,

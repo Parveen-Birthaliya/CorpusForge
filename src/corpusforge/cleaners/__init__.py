@@ -15,11 +15,13 @@ from src.corpusforge.cleaners.unicode_cleaner import (
     remove_control_characters,
 )
 from src.corpusforge.cleaners.whitespace_cleaner import (
-    fix_pdf_hyphenation,
+    fix_hyphenation,
     normalise_whitespace,
     remove_page_markers,
     remove_urls,
 )
+from src.corpusforge.cleaners.intra_dedup import remove_intra_doc_duplicates
+from src.corpusforge.cleaners.structural_cleaner import remove_structural_noise
 
 __all__ = [
     "HeuristicCleaner",
@@ -29,5 +31,7 @@ __all__ = [
     "normalise_whitespace",
     "remove_urls",
     "remove_page_markers",
-    "fix_pdf_hyphenation",
+    "fix_hyphenation",
+    "remove_intra_doc_duplicates",
+    "remove_structural_noise",
 ]
