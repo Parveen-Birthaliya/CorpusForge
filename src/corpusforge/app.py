@@ -20,6 +20,8 @@ def _run_pipeline_on_files(
     min_chars: int,
     max_rep: float,
     skip_near_dedup: bool,
+    enable_advanced_pii: bool,
+    enable_ocr: bool,
 ) -> tuple[str, str]:
     """Run the full CorpusForge pipeline on uploaded files.
 
@@ -50,7 +52,7 @@ def _run_pipeline_on_files(
             file_paths.append(Path(str(f)))
 
     loaders      = [TxtLoader(), PdfLoader()]
-    cleaner      = HeuristicCleaner()
+    cleaner      = HeuristicCleaner(enable_advanced_pii=enable_advanced_pii, enable_ocr=enable_ocr)
     quality      = QualityFilter(
         min_chars=min_chars,
         target_lang=target_lang,
@@ -194,6 +196,18 @@ Upload `.txt` or `.pdf` files → the 5-stage pipeline runs automatically → do
                         label="⚡ Skip Near-Deduplication (MinHash)",
                         info="Faster — skips the MinHash LSH near-dedup pass.",
                     )
+                
+                with gr.Accordion("🤖 Advanced ML Cleaners (Slower)", open=False):
+                    enable_pii_input = gr.Checkbox(
+                        value=False,
+                        label="🕵️ Advanced PII Redaction (spaCy NER)",
+                        info="Detects and redacts human names, organizations, and locations.",
+                    )
+                    enable_ocr_input = gr.Checkbox(
+                        value=False,
+                        label="📖 OCR Auto-Correction (SymSpell)",
+                        info="Detects and auto-corrects corrupted words like 'awes0me' -> 'awesome'.",
+                    )
 
                 with gr.Row():
                     run_btn   = gr.Button("🚀 Run Pipeline", variant="primary", scale=3)
@@ -223,6 +237,8 @@ Upload `.txt` or `.pdf` files → the 5-stage pipeline runs automatically → do
                 min_chars_input,
                 max_rep_input,
                 skip_near_input,
+                enable_pii_input,
+                enable_ocr_input,
             ],
             outputs=[file_output, report_output],
         )
